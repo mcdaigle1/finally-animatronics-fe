@@ -1,0 +1,45 @@
+Use Vite. React’s docs recommend using a build tool like Vite for a new app.  
+
+1. Install Node.js
+
+Install the LTS version from Node.js. Node LTS currently shows as v24.17.0 LTS.  
+
+Verify:
+    node -v
+    npm -v
+
+2. Create a React project
+    cd ~/workspace
+    npm create vite@latest finally-animatronics-fe -- --template react
+    cd finally-animatronics-fe
+    npm install
+
+3. Run locally
+    npm run dev
+
+Open the localhost URL it prints, usually:
+    http://localhost:5173
+
+4. Add your API URL
+
+Create:
+    touch .env
+
+Add:
+
+    VITE_API_BASE_URL=https://api.finallyanimatronics.com
+
+Use it in React:
+
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
+5. Build for production
+
+    npm run build
+
+Output goes to:
+
+    dist/
+
+That dist/ folder is what you later package into an NGINX Docker image for Kubernetes.
+
