@@ -1,0 +1,95 @@
+name: Build and Push main to ECR
+
+on:
+  # push:
+  #   tags:
+  #     - "prod-v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-west-1
+  ECR_REPOSITORY: finally_animatronics_fe_prod
+  ECR_REGISTRY: 450287579526.dkr.ecr.us-west-1.amazonaws.com
+  IMAGE_TAG: ${{ github.ref_name }}
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: mcdaigle1/finally_animatronics_fe
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install
+
+      # Build to test syntax
+      - name: Compile Python files
+        run: poetry run python -m compileall finally_animatronics_api
+
+      # testing
+      - name: Run tests
+        run: poetry run pytest || [ $? -eq 5 ]
+
+      # Linting
+      - name: Run Ruff
+        run: poetry run ruff check .
+
+      # Type checker
+      - name: Run mypy
+        run: poetry run mypy finally_animatronics_api
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::450287579526:role/github-actions-ecr-push
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          aws-region: us-west-1
+
+      - name: Build Docker image
+        run: |
+          docker build --no-cache \
+            --build-arg VITE_API_BASE_URL=https://api.finallyanimatronics.com \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+      
+      - name: Push Docker image
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: mcdaigle1/finally-animatronics-gitops
+          token: ${{ secrets.GITOPS_REPO_TOKEN }}
+          path: gitops
+
+      - name: Update image tag in GitOps repo
+        run: |
+          cd gitops
+          sed -i 's/tag: ".*"/tag: "'"$IMAGE_TAG"'"/' apps/finally-animatronics-fe/values-prod.yaml
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add apps/finally-animatronics-fe/values-prod.yaml
+          git commit -m "Update finally-animatronics-fe image to $IMAGE_TAG"
+          git push
+

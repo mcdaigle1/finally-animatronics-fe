@@ -23,7 +23,7 @@ Open the localhost URL it prints, usually:
 4. Add your API URL
 
 Create:
-    touch .env
+    touch .env.local
 
 Add:
 
